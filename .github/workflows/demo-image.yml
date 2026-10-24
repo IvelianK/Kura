@@ -1,0 +1,136 @@
+name: Demo
+
+# Prueba la demo en un contenedor endurecido y, si pasa, la publica como paquete de
+# contenedor en GitHub Packages (ghcr.io) cuando cambia en main. En cada etiqueta de
+# versión adjunta además un zip a la release. En los pull request solo se prueba.
+on:
+  push:
+    branches: [main]
+    paths: [demo/**, deploy/**, .dockerignore, .github/workflows/demo-image.yml]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: demo-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  prueba:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validar docker-compose.yml
+        run: docker compose -f deploy/docker-compose.yml config --quiet
+
+      - name: Construir la imagen
+        run: docker build -f deploy/Dockerfile -t kura-prueba .
+
+      # Mismas opciones que el docker run del README
+      - name: Arrancar el contenedor endurecido
+        run: |
+          docker run -d --name kura-prueba -p 127.0.0.1:8080:8080 --read-only --tmpfs /tmp \
+            --cap-drop ALL --security-opt no-new-privileges:true kura-prueba
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8080/healthz >/dev/null 2>&1 && exit 0
+            sleep 1
+          done
+          docker logs kura-prueba
+          exit 1
+
+      - name: Comprobar respuestas y cabeceras
+        run: |
+          set -eu
+          test "$(curl -fsS http://127.0.0.1:8080/healthz)" = "ok"
+          curl -fsS http://127.0.0.1:8080/ | grep -q "<title>Kura"
+          for f in app.js styles.css; do curl -fsS -o /dev/null "http://127.0.0.1:8080/$f"; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/no-existe)" = "404"
+          cabeceras="$(curl -fsSI http://127.0.0.1:8080/)"
+          for c in "Content-Security-Policy: default-src 'none'" "X-Content-Type-Options: nosniff" \
+                   "Referrer-Policy: no-referrer" "Permissions-Policy:" "Cross-Origin-Opener-Policy: same-origin"; do
+            printf '%s\n' "$cabeceras" | grep -qiF "$c" || { echo "Falta la cabecera: $c"; exit 1; }
+          done
+          printf '%s\n' "$cabeceras" | grep -qiE '^server: nginx/[0-9]' && { echo "nginx expone su versión"; exit 1; }
+          test "$(docker inspect -f '{{.Config.User}}' kura-prueba)" = "101"
+          echo "Todo correcto"
+
+      - name: Registro del contenedor
+        if: always()
+        run: docker logs kura-prueba || true
+
+  imagen:
+    needs: prueba
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # El Dockerfile no ejecuta nada (solo COPY): buildx genera amd64 y arm64 sin emulación
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/kura-docs-demo
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  zip:
+    needs: prueba
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Empaquetar
+        run: |
+          nombre="kura-demo-${GITHUB_REF_NAME}"
+          mkdir "$nombre"
+          cp -r demo deploy LICENSE "$nombre"/
+          zip -r "$nombre.zip" "$nombre"
+
+      - name: Adjuntar a la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
+          gh release upload "$GITHUB_REF_NAME" "kura-demo-${GITHUB_REF_NAME}.zip" --clobber

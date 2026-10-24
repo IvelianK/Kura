@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kura · demo</title>
+  <meta name="description" content="Demo navegable del panel de un servidor doméstico autoalojado. Datos inventados.">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307090d'/%3E%3Cpath d='M8 13 16 7l8 6v12H8z' fill='none' stroke='%23d9a65f' stroke-width='2.2' stroke-linejoin='round'/%3E%3Cpath d='M13 25v-6h6v6' fill='none' stroke='%23d9a65f' stroke-width='2.2'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 13 16 7l8 6v12H8z"/><path d="M13 25v-6h6v6"/></svg>
+      <div>
+        <h1>Kura</h1>
+        <p class="sub">servidor doméstico · demo con datos inventados</p>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Secciones">
+      <button role="tab" id="t-panel" aria-controls="v-panel" aria-selected="true" aria-keyshortcuts="1" data-view="panel"><kbd aria-hidden="true">1</kbd>Panel</button>
+      <button role="tab" id="t-red" aria-controls="v-red" aria-selected="false" aria-keyshortcuts="2" data-view="red"><kbd aria-hidden="true">2</kbd>Red</button>
+      <button role="tab" id="t-copias" aria-controls="v-copias" aria-selected="false" aria-keyshortcuts="3" data-view="copias"><kbd aria-hidden="true">3</kbd>Copias</button>
+      <button role="tab" id="t-bitacora" aria-controls="v-bitacora" aria-selected="false" aria-keyshortcuts="4" data-view="bitacora"><kbd aria-hidden="true">4</kbd>Bitácora</button>
+    </nav>
+    <div class="status">
+      <span class="pulse" aria-hidden="true"></span>
+      <span>31 de 31 en línea</span>
+      <time id="clock"></time>
+    </div>
+  </header>
+
+  <main>
+    <!-- Panel -->
+    <section id="v-panel" role="tabpanel" aria-labelledby="t-panel" class="view active">
+      <div class="hero">
+        <div>
+          <p class="eyebrow">Buenos días</p>
+          <h2 class="serif">Todo en orden en casa.</h2>
+        </div>
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="q" type="search" placeholder="Buscar servicio" autocomplete="off" aria-label="Buscar servicio">
+          <kbd>/</kbd>
+        </label>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="groups" id="groups"></div>
+    </section>
+
+    <!-- Red -->
+    <section id="v-red" role="tabpanel" aria-labelledby="t-red" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Topología</p>
+          <h2 class="serif">El camino de una petición</h2>
+          <p class="lead">Cero puertos abiertos en el router. Elige desde dónde llega la petición y pulsa un servicio para ver su ruta.</p>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Origen de la petición">
+          <button role="radio" aria-checked="true" data-origin="fuera">Desde internet</button>
+          <button role="radio" aria-checked="false" data-origin="casa">Desde casa</button>
+          <button role="radio" aria-checked="false" data-origin="vpn">Por la VPN</button>
+        </div>
+      </div>
+      <div class="glass net-wrap">
+        <svg id="net" viewBox="0 0 1200 560" role="group" aria-labelledby="net-title"></svg>
+      </div>
+      <div class="net-legend" id="net-info"></div>
+    </section>
+
+    <!-- Copias -->
+    <section id="v-copias" role="tabpanel" aria-labelledby="t-copias" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Copias</p>
+          <h2 class="serif">Cada domingo, a las cuatro</h2>
+          <p class="lead">Volcado de bases de datos a las 03:30, copia cifrada y deduplicada a las 04:00, y nunca más de dos copias por trabajo.</p>
+        </div>
+      </div>
+      <div class="cal glass" id="cal"></div>
+      <div class="jobs" id="jobs"></div>
+      <div class="glass retention">
+        <div class="ret-head">
+          <div>
+            <h3 class="serif">Retención de dos copias</h3>
+            <p class="lead small">Cada copia nueva empuja fuera la más antigua. Gracias a la deduplicación, la segunda solo ocupa lo que cambió.</p>
+          </div>
+          <button class="btn" id="ret-step">Avanzar una semana</button>
+        </div>
+        <div class="slots" id="slots"></div>
+      </div>
+    </section>
+
+    <!-- Bitácora -->
+    <section id="v-bitacora" role="tabpanel" aria-labelledby="t-bitacora" class="view" hidden>
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">Bitácora</p>
+          <h2 class="serif">Cada cambio, con su vuelta atrás</h2>
+          <p class="lead">Lo que se hizo, lo que se rompió y cómo se deshace. Pulsa una entrada para abrirla.</p>
+        </div>
+        <div class="seg" role="radiogroup" aria-label="Filtrar bitácora" id="log-filter">
+          <button role="radio" aria-checked="true" data-kind="todo">Todo</button>
+          <button role="radio" aria-checked="false" data-kind="cambio">Cambios</button>
+          <button role="radio" aria-checked="false" data-kind="incidente">Incidentes</button>
+          <button role="radio" aria-checked="false" data-kind="seguridad">Seguridad</button>
+        </div>
+      </div>
+      <ol class="log" id="log"></ol>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>Kura · documentación y demo en <a href="https://github.com/IvelianK/Kura">GitHub</a></span>
+    <span>Datos inventados. Nada de esto toca un servidor real.</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>

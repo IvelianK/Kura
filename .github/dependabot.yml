@@ -1,0 +1,15 @@
+# Mantiene al día las acciones del workflow (fijadas por SHA) y la imagen base de nginx.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      acciones:
+        patterns: ["*"]
+
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
